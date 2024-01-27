@@ -3,7 +3,6 @@ import torch.nn as nn
 import numpy as np
 from torchvision import ops
 import torch.nn.functional as F
-from torchvision.ops import roi_align
 
 try:
     from torch.hub import load_state_dict_from_url
@@ -280,20 +279,6 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
                                               progress=progress)
         model.load_state_dict(state_dict)
     return model
-def roi_align_and_resize(image_tensor, annotations, output_size):
-    device = image_tensor.device
-    num_rois = len(annotations)
-
-    # 将注释框坐标转换成 ROI 格式 (batch_index, x_min, y_min, x_max, y_max)
-    rois = torch.zeros(num_rois, 5, dtype=torch.float32, device=device)
-    for i, annotation in enumerate(annotations):
-        x_min, y_min, x_max, y_max = annotation
-        rois[i, :] = torch.tensor([0, x_min, y_min, x_max, y_max], dtype=torch.float32, device=device)
-
-    # 使用 ROIAlign 进行感兴趣区域的裁剪和缩放
-    cropped_tensors = roi_align(image_tensor.unsqueeze(0), rois, output_size=output_size)
-
-    return cropped_tensors
 
 def resnet18(pretrained=False, progress=True, **kwargs):
     r"""ResNet-18 model from
