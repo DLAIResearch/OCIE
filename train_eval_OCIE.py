@@ -19,7 +19,7 @@ import torch.utils.data.distributed
 import torchvision
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-from dataset.imagefolder_cgc_ssl import ImageFolder
+from dataset.imagefolder_OCIE import ImageFolder
 import models.resnet_multigpu_cgc as resnet
 import logging
 from sklearn.metrics import recall_score, f1_score,precision_score
