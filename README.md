@@ -4,10 +4,8 @@ Deep neural networks (DNNs) face significant challenges related to opacity, inhe
 
 ![Image image](https://github.com/DLAIResearch/OCIE/blob/main/OCIE.jpg)
 
-<br/>
 ## Pre-requisites
 - Pytorch 1.3 - Please install [PyTorch](https://pytorch.org/get-started/locally/) and CUDA if you don't have it installed.
-
 - ## Datasets
  - [ImageNet - 100](https://www.image-net.org/download.php)
  - [CUB-200](https://vision.cornell.edu/se3/caltech-ucsd-birds-200/)
@@ -19,15 +17,15 @@ Deep neural networks (DNNs) face significant challenges related to opacity, inhe
 * TorchRay-Github [link](https://github.com/facebookresearch/TorchRay)
 * LRP-based-Github [link](https://github.com/hila-chefer/Transformer-Explainability)
 
+Parameters and datasets need to be set up before running
 ## Extract  mask.pt file from training set samples
 ```
  python unsupervised_saliency_detection/get_saliency.py
 ```
-
 ## Training
 Parameters and datasets need to be set up before running
 
-## Train and evaluate Baseline methods (classification)
+#### Train and evaluate Baseline methods (classification)
 ```
  python baseline_train_eval.py  
  python baseline_train_eval_VIT.py 
@@ -40,28 +38,30 @@ Parameters and datasets need to be set up before running
  python train_eval_OCIE_VIT.py
  python train_eval_OCIE_VIT_mask.py
 ```
-
-#### Evaluate model checkpoint using CH,SPG,and SNR
+## Evaluate model explanation using CH,SPG,and SNR
 We use the evaluation code adapted from the TorchRay framework.
+
+#### Parameter settings
 * Change directory to TorchRay and install the library. Please refer to the [TorchRay](https://github.com/facebookresearch/TorchRay) repository for full documentation and instructions.
     * cd TorchRay
     * python setup.py install
 
 * Change directory to TorchRay/torchray/benchmark
     * cd torchray/benchmark
-     
-#### Evaluation 
 * For the ImageNet-100, CUB-200 and Stanfordcars datasets, this evaluation requires the following structure for validation images and bounding box xml annotations
     * <PATH_TO_FLAT_VAL_IMAGES_BBOX>/val/*.JPEG - Flat list of validation images
     * <PATH_TO_FLAT_VAL_IMAGES_BBOX>/annotation/*.xml - Flat list of annotation xml files
 * For the HAM dataset, use the masks provided with the dataset to generate mask.pt.
-* for example:
+
+#### 
 ```
 python evaluate_fined_gradcam_stochastic_pointinggame.py
 ...
+python evaluate_imagenet_gradcam_energy_inside_bbox.py
 ```
-
-##### Evaluate sufficient-F1
+##  Evaluate explanation sufficiency 
+Using images from the validation set
+#### Evaluate sufficient-F1
 ```
 python  sufficient_F1_ResNet.py
 python  sufficient_F1_Vit.py
