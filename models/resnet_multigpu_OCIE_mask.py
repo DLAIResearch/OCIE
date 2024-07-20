@@ -206,8 +206,8 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, images, engry_criterion=None, xe_images=None,aug_images=None,pred=None,  targets=None,
-                 xent_criterion=None,align_loss=None, vanilla=False, vanilla_with_feats=False, disable_contrast=False):
+    def forward(self, images, engry_criterion=None, xe_images=None,pred=None,  targets=None,
+                 xent_criterion=None, vanilla=False, vanilla_with_feats=False, disable_contrast=False):
         """
         This function serves as the wrapper which computes both losses and returns the loss values
         to work around the DataParallel limitation for splitting gradients/feats on each GPU and
@@ -235,23 +235,23 @@ class ResNet(nn.Module):
 
         # perform forward for images to obtain original Grad-CAM
         images_outputs, images_feats= self.forward_vanilla(images, return_feats=True)
-        aug_images_outputs, aug_images_feats = self.forward_vanilla(aug_images, return_feats=True)
+        # aug_images_outputs, aug_images_feats = self.forward_vanilla(aug_images, return_feats=True)
 
         target1 = np.argmax(images_outputs.cpu().data.numpy(), axis=-1)
-        target2 = np.argmax(aug_images_outputs.cpu().data.numpy(), axis=-1)
+        # target2 = np.argmax(aug_images_outputs.cpu().data.numpy(), axis=-1)
         # orig_gradcam_mask = compute_gradcam_mask(images_outputs, images_feats, target1, self.relu)
         # aug_gradcam_mask = compute_gradcam_mask(aug_images_outputs, aug_images_feats, target2, self.relu)
         # orig_gradcam_mask = compute_Layercam(images_outputs, images_feats, target, self.relu)
         orig_gradcam_mask = compute_gradcam_mask(images_outputs, images_feats, target1, self.relu)
-        aug_gradcam_mask = compute_gradcam_mask(aug_images_outputs, aug_images_feats, target2, self.relu)
+        # aug_gradcam_mask = compute_gradcam_mask(aug_images_outputs, aug_images_feats, target2, self.relu)
         orig_gradcam_mask = normalize(orig_gradcam_mask)
-        aug_gradcam_mask = normalize(aug_gradcam_mask)
-        sim_loss = engry_criterion(pred.float(), aug_gradcam_mask)
-        align_loss=align_loss(aug_gradcam_mask.flatten(1),(orig_gradcam_mask*pred.float()).flatten(1))
+        # aug_gradcam_mask = normalize(aug_gradcam_mask)
+        sim_loss = engry_criterion(pred.float(), orig_gradcam_mask)
+        # align_loss=align_loss(aug_gradcam_mask.flatten(1),(orig_gradcam_mask*pred.float()).flatten(1))
         # # cross entropy loss will be between the outputs corresponding to the augmented images and the targets
-        xe_loss = xent_criterion(images_outputs, targets.cuda()) + xent_criterion(aug_images_outputs, targets.cuda())+xent_criterion(xe_images_output, targets.cuda())
+        xe_loss = xent_criterion(images_outputs, targets.cuda()) +xent_criterion(xe_images_output, targets.cuda())
 
-        return xe_images_output,xe_loss, sim_loss,align_loss
+        return xe_images_output,xe_loss, sim_loss
 
     def forward_vanilla(self, x, return_feats=False):
         x = self.conv1(x)

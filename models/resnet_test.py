@@ -3,8 +3,6 @@ import torch.nn as nn
 import numpy as np
 from torchvision import ops
 import torch.nn.functional as F
-from torchvision.ops import roi_align
-
 try:
     from torch.hub import load_state_dict_from_url
 except ImportError:
@@ -141,7 +139,7 @@ class ResNet(nn.Module):
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
-            # each element in the tuple indicates if we should rceplace
+            # each element in the tuple indicates if we should replace
             # the 2x2 stride with a dilated convolution instead
             replace_stride_with_dilation = [False, False, False]
         if len(replace_stride_with_dilation) != 3:
@@ -163,7 +161,7 @@ class ResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
-        # self.upsample = nn.Upsample((7, 7), mode='bilinear')
+        self.upsample = nn.Upsample((7, 7), mode='bilinear')
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -206,8 +204,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, images, engry_criterion=None, xe_images=None,aug_images=None,pred=None,  targets=None,
-                 xent_criterion=None,align_loss=None, vanilla=False, vanilla_with_feats=False, disable_contrast=False):
+    def forward(self, images,  vanilla=False, vanilla_with_feats=False, disable_contrast=True):
         """
         This function serves as the wrapper which computes both losses and returns the loss values
         to work around the DataParallel limitation for splitting gradients/feats on each GPU and
@@ -221,7 +218,6 @@ class ResNet(nn.Module):
         :param xent_criterion: cross-entropy loss criterion
         :param vanilla: If True, return the outputs from a regular forward pass through the model
         :param vanilla_with_feats: If True, return the feats as well as outputs
-        :param vanilla_with_feats: If True, return the feats as well as outputs
         :return:
         """
         # we keep both flags to maintain backward compatibility with previous code
@@ -231,27 +227,14 @@ class ResNet(nn.Module):
             return self.forward_vanilla(images, return_feats=True)
 
         # perform forward for xe images for xe loss
-        xe_images_output = self.forward_vanilla(xe_images)
+        # xe_images_output = self.forward_vanilla(xe_images)
 
         # perform forward for images to obtain original Grad-CAM
-        images_outputs, images_feats= self.forward_vanilla(images, return_feats=True)
-        aug_images_outputs, aug_images_feats = self.forward_vanilla(aug_images, return_feats=True)
+        images_outputs, images_feats = self.forward_vanilla(images, return_feats=True)
+        target = np.argmax(images_outputs.cpu().data.numpy(), axis=-1)
 
-        target1 = np.argmax(images_outputs.cpu().data.numpy(), axis=-1)
-        target2 = np.argmax(aug_images_outputs.cpu().data.numpy(), axis=-1)
-        # orig_gradcam_mask = compute_gradcam_mask(images_outputs, images_feats, target1, self.relu)
-        # aug_gradcam_mask = compute_gradcam_mask(aug_images_outputs, aug_images_feats, target2, self.relu)
-        # orig_gradcam_mask = compute_Layercam(images_outputs, images_feats, target, self.relu)
-        orig_gradcam_mask = compute_gradcam_mask(images_outputs, images_feats, target1, self.relu)
-        aug_gradcam_mask = compute_gradcam_mask(aug_images_outputs, aug_images_feats, target2, self.relu)
-        orig_gradcam_mask = normalize(orig_gradcam_mask)
-        aug_gradcam_mask = normalize(aug_gradcam_mask)
-        sim_loss = engry_criterion(pred.float(), aug_gradcam_mask)
-        align_loss=align_loss(aug_gradcam_mask.flatten(1),(orig_gradcam_mask*pred.float()).flatten(1))
-        # # cross entropy loss will be between the outputs corresponding to the augmented images and the targets
-        xe_loss = xent_criterion(images_outputs, targets.cuda()) + xent_criterion(aug_images_outputs, targets.cuda())+xent_criterion(xe_images_output, targets.cuda())
 
-        return xe_images_output,xe_loss, sim_loss,align_loss
+        return images_outputs,images_feats
 
     def forward_vanilla(self, x, return_feats=False):
         x = self.conv1(x)
@@ -280,20 +263,7 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
                                               progress=progress)
         model.load_state_dict(state_dict)
     return model
-def roi_align_and_resize(image_tensor, annotations, output_size):
-    device = image_tensor.device
-    num_rois = len(annotations)
 
-    # 将注释框坐标转换成 ROI 格式 (batch_index, x_min, y_min, x_max, y_max)
-    rois = torch.zeros(num_rois, 5, dtype=torch.float32, device=device)
-    for i, annotation in enumerate(annotations):
-        x_min, y_min, x_max, y_max = annotation
-        rois[i, :] = torch.tensor([0, x_min, y_min, x_max, y_max], dtype=torch.float32, device=device)
-
-    # 使用 ROIAlign 进行感兴趣区域的裁剪和缩放
-    cropped_tensors = roi_align(image_tensor.unsqueeze(0), rois, output_size=output_size)
-
-    return cropped_tensors
 
 def resnet18(pretrained=False, progress=True, **kwargs):
     r"""ResNet-18 model from
@@ -417,3 +387,7 @@ def wide_resnet101_2(pretrained=False, progress=True, **kwargs):
     kwargs['width_per_group'] = 64 * 2
     return _resnet('wide_resnet101_2', Bottleneck, [3, 4, 23, 3],
                    pretrained, progress, **kwargs)
+
+def normalize_tensor_by_image(tensor):
+    normalized_tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min())
+    return normalized_tensor
