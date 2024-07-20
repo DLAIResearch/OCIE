@@ -5,7 +5,7 @@ from PIL import Image
 import os
 import os.path
 from torchvision import transforms
-
+import numpy as np
 def has_file_allowed_extension(filename, extensions):
     """Checks if a file is an allowed extension.
 
@@ -108,7 +108,8 @@ class DatasetFolder(VisionDataset):
         self.targets = [s[1] for s in samples]
         self.hor_flip = transforms.RandomHorizontalFlip()
         self.to_tensor = transforms.ToTensor()
-        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
         self.resize=transforms.Resize((224,224))
         self.box = joblib.load('../ASGC1/dataset/image_masks_0.5_filter.pt')
 
@@ -142,10 +143,10 @@ class DatasetFolder(VisionDataset):
         sample = self.loader(path)
         image_path=os.path.basename(path)
         pred = self.box[image_path,]
-        pred=torch.tensor(pred).squeeze(0)
+        pred=torch.tensor(pred)
         xe_sample = transforms.RandomResizedCrop(224)(sample)
         xe_sample = transforms.RandomHorizontalFlip()(xe_sample)
-        # sample = transforms.Resize((224,224))(sample)
+
         sample = transforms.Resize((256,256))(sample)
         sample = transforms.CenterCrop(224)(sample)
 
@@ -154,8 +155,7 @@ class DatasetFolder(VisionDataset):
 
         xe_sample = self.to_tensor(xe_sample)
         xe_sample = self.normalize(xe_sample)
-        aug_sample=(sample*pred).float()
-        return xe_sample,sample,aug_sample,target, pred
+        return xe_sample,sample,target, pred
 
     def __len__(self):
         return len(self.samples)
