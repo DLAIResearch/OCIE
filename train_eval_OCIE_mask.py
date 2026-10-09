@@ -417,40 +417,40 @@ def validate(val_loader, model, engry_criterion, criterion, args, logger):
 
     with torch.no_grad():
         end = time.time()
-        for i, (images, targets) in enumerate(val_loader):
+        all_targets = []
+        all_preds = []
+        for i, (images, target) in enumerate(val_loader):
             if args.gpu is not None:
-              images = images.cuda(args.gpu, non_blocking=True)
-              targets = targets.cuda(args.gpu, non_blocking=True)
+                images = images.cuda(args.gpu, non_blocking=True)
+            if torch.cuda.is_available():
+                target = target.cuda(args.gpu, non_blocking=True)
+            output = model(images)
+            loss = criterion(output, target)
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            preds = torch.argmax(output, dim=1)
+        
+            all_targets.append(target.detach().cpu())
+            all_preds.append(preds.detach().cpu())
 
-            # compute output
-            output = model(images, engry_criterion, vanilla=True)
-            loss = criterion(output, targets)
-            acc1, acc5 = accuracy(output, targets, topk=(1, 5))
-            class_output = np.argmax(output.cpu(), axis=1)
-            recall = torch.tensor(recall_score(targets.cpu(), class_output, average='weighted'),
-                                  dtype=torch.float32).cuda()
-            f1 = torch.tensor(f1_score(targets.cpu(), class_output, average='weighted'),
-                              dtype=torch.float32).cuda()  # measure accuracy and record loss
-            precision = torch.tensor(precision_score(targets.cpu(), class_output, average='weighted'),
-                                     dtype=torch.float32).cuda()
-            # measure accuracy and record loss
             losses.update(loss.item(), images.size(0))
             top1.update(acc1[0], images.size(0))
             top5.update(acc5[0], images.size(0))
-            recalls.update(recall.item(), images.size(0))
-            f1s.update(f1.item(), images.size(0))
-            precisions.update(precision.item(), images.size(0))
-            # measure elapsed time
+
             batch_time.update(time.time() - end)
             end = time.time()
-
             if i % args.print_freq == 0:
                 progress.display(i)
+    
+        all_targets = torch.cat(all_targets).numpy()
+        all_preds = torch.cat(all_preds).numpy()
+        recall = recall_score(all_targets, all_preds, average='weighted')
+        f1 = f1_score(all_targets, all_preds, average='weighted')
+        precision = precision_score(all_targets, all_preds, average='weighted')
 
         logger.info(
-            ' * Acc@1 {top1.avg:.4f} Acc@5 {top5.avg:.4f} recall {recalls.avg:.4f} f1 {f1s.avg:.4f} precision {precisions.avg:.4f}'
-            .format(top1=top1, top5=top5, recalls=recalls, f1s=f1s, precisions=precisions))
-
+            ' * Acc@1 {top1.avg:.4f} Acc@5 {top5.avg:.4f} recall {recall:.4f} f1 {f1:.4f} precision {precision:.4f}'
+            .format(top1=top1, top5=top5, recall=recall, f1=f1, precision=precision)
+        )
     return top1.avg
 
 
