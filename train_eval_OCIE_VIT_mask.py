@@ -454,7 +454,7 @@ def validate(val_loader, model, engry_criterion, criterion, args, logger):
             ' * Acc@1 {top1.avg:.4f} Acc@5 {top5.avg:.4f} recall {recall:.4f} f1 {f1:.4f} precision {precision:.4f}'
             .format(top1=top1, top5=top5, recall=recall, f1=f1, precision=precision)
         )
-return top1.avg
+    return top1.avg
 
 
 
